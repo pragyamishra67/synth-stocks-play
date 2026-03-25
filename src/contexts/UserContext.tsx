@@ -75,6 +75,10 @@ interface UserContextType {
   likePost: (postId: string) => void;
   dislikePost: (postId: string) => void;
   deletePost: (postId: string) => void;
+  quizMistakes: QuizMistake[];
+  tradeMistakes: TradeMistake[];
+  addQuizMistake: (mistake: Omit<QuizMistake, 'timestamp'>) => void;
+  addTradeMistake: (mistake: Omit<TradeMistake, 'timestamp'>) => void;
 }
 
 const UserContext = createContext<UserContextType | null>(null);
