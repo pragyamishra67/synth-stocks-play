@@ -92,7 +92,7 @@ const modulesData = [
 ];
 
 const Modules = () => {
-  const { user, completeModule, addCoins, addXp } = useUser();
+  const { user, completeModule, addCoins, addXp, addQuizMistake } = useUser();
   const [activeModule, setActiveModule] = useState<number | null>(null);
   const [quizMode, setQuizMode] = useState(false);
   const [answers, setAnswers] = useState<number[]>([]);
