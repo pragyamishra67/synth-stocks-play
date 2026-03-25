@@ -95,7 +95,14 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
 
   const [forumPosts, setForumPosts] = useState<ForumPost[]>(() => {
     const saved = localStorage.getItem(FORUM_KEY);
-    return saved ? JSON.parse(saved) : defaultPosts;
+    if (saved) {
+      const parsed = JSON.parse(saved) as ForumPost[];
+      // Merge: keep default posts if not already present
+      const ids = new Set(parsed.map(p => p.id));
+      const missing = defaultPosts.filter(dp => !ids.has(dp.id));
+      return [...parsed, ...missing];
+    }
+    return defaultPosts;
   });
 
   useEffect(() => {
