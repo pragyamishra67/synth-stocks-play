@@ -6,12 +6,20 @@ export interface ModuleProgress {
   score: number;
 }
 
+export interface ForumReply {
+  author: string;
+  content: string;
+  timestamp: number;
+}
+
 export interface ForumPost {
   id: string;
   author: string;
   content: string;
   timestamp: number;
-  replies: { author: string; content: string; timestamp: number }[];
+  likes: number;
+  dislikes: number;
+  replies: ForumReply[];
 }
 
 export interface Holding {
