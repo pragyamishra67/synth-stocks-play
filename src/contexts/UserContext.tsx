@@ -77,9 +77,25 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
     return saved ? JSON.parse(saved) : null;
   });
 
+  const defaultPosts: ForumPost[] = [
+    { id: 'dummy-1', author: 'CyberTrader99', content: 'Just completed the Risk Management module. The 2% rule is a game changer! 🚀', timestamp: Date.now() - 3600000, likes: 12, dislikes: 1, replies: [
+      { author: 'NeonBull', content: 'Agreed! It saved me from huge losses in mock trading.', timestamp: Date.now() - 3000000 },
+      { author: 'PixelWhale', content: 'Which module did you do next?', timestamp: Date.now() - 2400000 },
+    ]},
+    { id: 'dummy-2', author: 'NeonBull', content: 'Anyone else think CYBR stock is overvalued in mock trading? Sitting at 340 coins per share seems high.', timestamp: Date.now() - 7200000, likes: 8, dislikes: 3, replies: [
+      { author: 'DataMiner42', content: 'It\'s been pumping since yesterday. I\'d wait for a dip.', timestamp: Date.now() - 6000000 },
+    ]},
+    { id: 'dummy-3', author: 'PixelWhale', content: 'Pro tip: Always diversify your mock portfolio. Don\'t put all coins into one stock! 📊', timestamp: Date.now() - 14400000, likes: 24, dislikes: 0, replies: [] },
+    { id: 'dummy-4', author: 'DataMiner42', content: 'The candlestick chart module was really helpful. Now I can read patterns much better.', timestamp: Date.now() - 28800000, likes: 15, dislikes: 2, replies: [
+      { author: 'CyberTrader99', content: 'Wait until you try applying it in live charts!', timestamp: Date.now() - 25200000 },
+      { author: 'AlphaVolt', content: 'The doji pattern explanation was 🔥', timestamp: Date.now() - 21600000 },
+    ]},
+    { id: 'dummy-5', author: 'AlphaVolt', content: 'Just hit Level 5! The grind is real but worth it. Veteran badge unlocked 🏆', timestamp: Date.now() - 43200000, likes: 31, dislikes: 0, replies: [] },
+  ];
+
   const [forumPosts, setForumPosts] = useState<ForumPost[]>(() => {
     const saved = localStorage.getItem(FORUM_KEY);
-    return saved ? JSON.parse(saved) : [];
+    return saved ? JSON.parse(saved) : defaultPosts;
   });
 
   useEffect(() => {
