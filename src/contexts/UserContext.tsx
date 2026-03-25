@@ -220,11 +220,38 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
     setForumPosts(posts => posts.filter(p => p.id !== postId));
   };
 
+  const [quizMistakes, setQuizMistakes] = useState<QuizMistake[]>(() => {
+    const saved = localStorage.getItem(QUIZ_MISTAKES_KEY);
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  const [tradeMistakes, setTradeMistakes] = useState<TradeMistake[]>(() => {
+    const saved = localStorage.getItem(TRADE_MISTAKES_KEY);
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  useEffect(() => {
+    localStorage.setItem(QUIZ_MISTAKES_KEY, JSON.stringify(quizMistakes));
+  }, [quizMistakes]);
+
+  useEffect(() => {
+    localStorage.setItem(TRADE_MISTAKES_KEY, JSON.stringify(tradeMistakes));
+  }, [tradeMistakes]);
+
+  const addQuizMistake = (mistake: Omit<QuizMistake, 'timestamp'>) => {
+    setQuizMistakes(prev => [{ ...mistake, timestamp: Date.now() }, ...prev]);
+  };
+
+  const addTradeMistake = (mistake: Omit<TradeMistake, 'timestamp'>) => {
+    setTradeMistakes(prev => [{ ...mistake, timestamp: Date.now() }, ...prev]);
+  };
+
   return (
     <UserContext.Provider value={{
       user, signup, logout, addCoins, spendCoins, addXp,
       completeModule, updateHoldings, incrementTrades, addBadge,
       forumPosts, addForumPost, addReply, likePost, dislikePost, deletePost,
+      quizMistakes, tradeMistakes, addQuizMistake, addTradeMistake,
     }}>
       {children}
     </UserContext.Provider>
