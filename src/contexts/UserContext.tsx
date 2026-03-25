@@ -91,6 +91,8 @@ export const useUser = () => {
 
 const STORAGE_KEY = 'stockz_user';
 const FORUM_KEY = 'stockz_forum';
+const QUIZ_MISTAKES_KEY = 'stockz_quiz_mistakes';
+const TRADE_MISTAKES_KEY = 'stockz_trade_mistakes';
 
 export const UserProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(() => {
