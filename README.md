@@ -1,3 +1,3 @@
-# Welcome to your Lovable project
+# Welcome to our TEAM NEXUS project
 
 TODO: Document your project here
