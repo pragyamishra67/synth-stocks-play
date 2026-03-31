@@ -17,7 +17,7 @@ const navItems = [
   { title: 'Mistake Analysis', url: '/mistakes', icon: AlertTriangle },
 ];
 
-export function Layout({ children }: { children: ReactNode }) {
+export function Layout({ children, hideChatbar = false }: { children: ReactNode; hideChatbar?: boolean }) {
   const { user, logout } = useUser();
   const location = useLocation();
   const navigate = useNavigate();
@@ -70,7 +70,7 @@ export function Layout({ children }: { children: ReactNode }) {
       </main>
 
       {/* Persistent Chat Search Bar */}
-      <ChatSearchBar />
+      {!hideChatbar && <ChatSearchBar />}
     </div>
   );
 }

@@ -136,7 +136,7 @@ const BiweeklyTest = () => {
   const yMax = Math.ceil(Math.max(...allPrices) * 1.002);
 
   return (
-    <Layout>
+    <Layout hideChatbar>
       <div className="flex flex-col lg:flex-row gap-4 h-[calc(100vh-5rem)] max-h-[900px]">
         {/* ═══ LEFT HALF ═══ */}
         <div className="flex-1 flex flex-col gap-3 min-w-0">
