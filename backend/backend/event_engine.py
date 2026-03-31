@@ -55,16 +55,15 @@ class EventEngine:
         (drift_adjustment, volatility_adjustment, volume_multiplier)
         """
 
-        sector = self.sector_map[stock]
-
+        sector = self.sector_map.get(stock)
         drift_adj = 0.0
         vol_adj = 0.0
-        volume_mult = 1.0  # multiplier, not additive
+        volume_mult = 1.0
 
         for event in self.active_events:
 
-            # Only apply to matching sector
-            if event.target != sector:
+            # Apply to matching stock name OR matching sector
+            if event.target != stock and event.target != sector:
                 continue
 
             decay = event.decay_factor()
@@ -75,7 +74,7 @@ class EventEngine:
             base_effect = event.sentiment * event.impact * decay
 
             # 🔴 CRITICAL: Proper scaling (prevents explosion)
-            drift_adj += base_effect * 0.0004       # Scale for long duration
+            drift_adj += base_effect * 0.0004
             vol_adj += abs(base_effect) * 0.001
             volume_mult += event.volume_spike * decay * 0.1
 

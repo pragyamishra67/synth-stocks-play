@@ -10,6 +10,7 @@ from dotenv import load_dotenv
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 import uvicorn
+from collections import defaultdict
 
 # -------- LOAD ENV --------
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -49,91 +50,109 @@ clients = []
 # -------- BROADCAST FUNCTION --------
 async def broadcast(data):
     for client in clients:
-        await client.send_text(json.dumps(data))
+        try:
+            await client.send_text(json.dumps(data))
+        except:
+            pass # Handle disconnected clients gracefully
 
 
 # -------- LIFESPAN AND SIMULATION LOOP --------
 @asynccontextmanager
 async def lifespan(app: FastAPI):
 
-    # Initialize CSV history
+    # Step 2: Load and Split CSV (25% history, 75% streaming)
     load_csv_history()
 
     async def loop():
-        last_news_time = 0
+        # STEP 1: INITIAL NEWS GENERATION (MANDATORY START)
+        print("🚀 STEP 1: Generating Initial Market News...")
+        initial_news = news_engine.generate_news()
+        if initial_news:
+            valid_news = []
+            # we only take 4
+            for news in initial_news[:4]:
+                if news_engine.validate(news):
+                    event = news_to_event(news)
+                    event_engine.add_event(event)
+                    valid_news.append({
+                        "headline": news["headline"],
+                        "description": news["description"],
+                        "target": news["target"]
+                    })
+            if valid_news:
+                await broadcast({"type": "news_batch", "news": valid_news, "time": time.time()})
+        
+        last_news_time = time.time()
+        tick_counter = 0
+        tick_buffers = defaultdict(list)
 
+        print("📈 STEP 4/5: Starting Live Simulation Loop...")
         while True:
-            # -------- MARKET UPDATE --------
-            engine.generate_tick(candle_engine)
-
-            # -------- EVENT CLEANUP --------
-            event_engine.cleanup()
-
-            # -------- BROADCAST ANALYTICS --------
-            for stock in state.stock_prices:
-                pattern = pattern_engine.detect(stock)
-                risk_reward = risk_engine.get_ratio(stock)
-                await broadcast({
-                    "type": "analytics",
-                    "stock": stock,
-                    "pattern": pattern,
-                    "riskReward": risk_reward,
-                    "time": time.time()
-                })
-
-            # -------- SEND TICK DATA --------
-            for stock, price in state.stock_prices.items():
-                await broadcast({
-                    "type": "tick",
-                    "stock": stock,
-                    "price": price,
-                    "time": time.time()
-                })
-
-            # -------- SEND CANDLE DATA --------
-            for stock in state.stock_prices:
-                if state.candle_data[stock]:
-                    candle = state.candle_data[stock][-1]
-
+            # -------- TICK UPDATE (Every 1s) --------
+            for stock in ["TCS", "INFY", "HDFCBANK", "MARUTI"]:
+                tick = engine.get_streaming_tick(stock)
+                if tick:
+                    tick_buffers[stock].append(tick)
+                    # Broadcast Tick (1s)
                     await broadcast({
-                        "type": "candle",
+                        "type": "tick",
                         "stock": stock,
-                        "open": candle["open"],
-                        "high": candle["high"],
-                        "low": candle["low"],
-                        "close": candle["close"],
-                        "volume": candle["volume"],
-                        "time": int(time.time())
+                        "price": tick["price"],
+                        "time": tick["time"]
+                    })
+                    
+                    # Broadcast Analytics (Sync with data)
+                    pattern = pattern_engine.detect(stock)
+                    risk_reward = risk_engine.get_ratio(stock)
+                    await broadcast({
+                        "type": "analytics",
+                        "stock": stock,
+                        "pattern": pattern,
+                        "riskReward": risk_reward,
+                        "time": tick["time"]
                     })
 
-            # -------- NEWS GENERATION --------
+            # -------- CANDLE UPDATE (Every 5s) --------
+            tick_counter += 1
+            if tick_counter >= 5:
+                for stock in ["TCS", "INFY", "HDFCBANK", "MARUTI"]:
+                    candle = engine.aggregate_candle(stock, tick_buffers[stock])
+                    if candle:
+                        await broadcast({
+                            "type": "candle",
+                            "stock": stock,
+                            "open": candle["open"],
+                            "high": candle["high"],
+                            "low": candle["low"],
+                            "close": candle["close"],
+                            "volume": candle["volume"],
+                            "time": candle["time"]
+                        })
+                tick_buffers = defaultdict(list)
+                tick_counter = 0
+
+            # -------- PERIODIC NEWS (Step 1 - Every 10 mins) --------
             current_time = time.time()
-
-            if current_time - last_news_time > 600: # 10 minutes interval
-
-                news_list = news_engine.generate_news()
-
-                if news_list and isinstance(news_list, list):
+            if current_time - last_news_time > 600:
+                new_news = news_engine.generate_news()
+                if new_news:
                     valid_news = []
-                    for news in news_list[:4]: # we only take 4
+                    for news in new_news[:4]:
                         if news_engine.validate(news):
                             event = news_to_event(news)
                             event_engine.add_event(event)
                             valid_news.append({
                                 "headline": news["headline"],
+                                "description": news["description"],
                                 "target": news["target"]
                             })
-
                     if valid_news:
-                        await broadcast({
-                            "type": "news_batch",
-                            "news": valid_news,
-                            "time": current_time
-                        })
+                        await broadcast({"type": "news_batch", "news": valid_news, "time": current_time})
+                last_news_time = current_time
 
-                last_news_time = time.time()
-
-            # -------- LOOP DELAY --------
+            # EVENT CLEANUP
+            event_engine.cleanup()
+            
             await asyncio.sleep(1)
 
     task = asyncio.create_task(loop())
@@ -158,10 +177,9 @@ async def websocket_endpoint(ws: WebSocket):
     await ws.accept()
     clients.append(ws)
 
-    # SEND HISTORY ON CONNECTION
+    # Step 3: INITIAL GRAPH RENDERING (Send 25% History)
     for stock in state.stock_prices:
         if state.candle_data[stock]:
-            # we want to send the entire list as history
             await ws.send_text(json.dumps({
                 "type": "history",
                 "stock": stock,
@@ -172,7 +190,8 @@ async def websocket_endpoint(ws: WebSocket):
         while True:
             await asyncio.sleep(1)
     except:
-        clients.remove(ws)
+        if ws in clients:
+            clients.remove(ws)
 
 
 # -------- ENTRY POINT --------

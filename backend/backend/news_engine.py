@@ -2,8 +2,7 @@ import time
 import json
 import re
 from google import genai
-from event_engine import MarketEvent   # ✅ ADD THIS
-
+from event_engine import MarketEvent
 
 class NewsEngine:
 
@@ -24,7 +23,7 @@ class NewsEngine:
         for attempt in range(max_attempts):
             try:
                 response = self.client.models.generate_content(
-                    model="gemini-2.5-flash",
+                    model="gemini-2.0-flash", # Reverting to stable flash model
                     contents=prompt
                 )
 
@@ -35,17 +34,14 @@ class NewsEngine:
 
                 parsed = self._safe_parse(raw_text)
 
-                # Return list directly (even if some fail validation at this stage, server.py drops invalid ones)
                 if isinstance(parsed, list):
                     return parsed
                 else:
-                    # In case LLM still returns single dict, wrap in list
                     if isinstance(parsed, dict):
                         return [parsed]
                     return None
 
             except Exception as e:
-
                 if "429" in str(e):
                     self.current_idx = (self.current_idx + 1) % len(self.api_keys)
                     self._init_client()
@@ -56,34 +52,34 @@ class NewsEngine:
 
         return None
 
-    # -------- PROMPT --------
+    # -------- PROMPT (STEP 1 SCHEMA) --------
     def _build_prompt(self):
         return """
-Generate 4 realistic financial market news events affecting India's stock sectors.
+Generate exactly 4 realistic financial market news events affecting specific Indian blue-chip stocks.
 
 STRICT RULES:
 - Output ONLY a valid JSON Array containing EXACTLY 4 objects.
-- No explanation
-- No markdown
-- No extra text
+- Each event MUST target exactly ONE of: ["TCS", "Infosys", "HDFC Bank", "Maruti Suzuki"].
+- Include a descriptive headline and a detailed description.
+- Sentiment must be "positive", "negative", or "neutral".
 
 JSON FORMAT:
 [
   {
     "headline": string,
-    "sentiment": float between -1 and 1,
-    "impact": float between 0.3 and 1,
-    "target": one of ["IT", "BANK", "AUTO"],
-    "duration": integer between 600 and 1800,
-    "volume_spike": float between 0.2 and 1
+    "description": string,
+    "sentiment": "positive" | "negative" | "neutral",
+    "sentiment_score": float between -1.0 and 1.0,
+    "impact_target": float between 0.1 and 1.0 (magnitude),
+    "target": "TCS" | "Infosys" | "HDFC Bank" | "Maruti Suzuki",
+    "volume_spike_target": float between 0.1 and 1.0
   },
-  ... (3 more objects like above)
+  ... (3 more objects)
 ]
 """
 
     # -------- SAFE PARSE --------
     def _safe_parse(self, text):
-
         try:
             return json.loads(text)
         except:
@@ -95,39 +91,42 @@ JSON FORMAT:
                 return json.loads(match.group())
             except:
                 return None
-
         return None
 
     # -------- VALIDATION --------
     def validate(self, data):
-
-        if not data:
+        if not data: return False
+        
+        required = ["headline", "description", "sentiment", "sentiment_score", "impact_target", "target"]
+        if not all(k in data for k in required):
             return False
 
-        if "headline" not in data or "sentiment" not in data or "target" not in data:
+        if data["target"] not in ["TCS", "Infosys", "HDFC Bank", "Maruti Suzuki"]:
             return False
 
-        data.setdefault("impact", 0.3)
-        data.setdefault("duration", 30)
-        data.setdefault("volume_spike", 0.2)
-
+        data.setdefault("volume_spike_target", 0.2)
         return True
 
-
-# -------- CONVERTER (FIXED) --------
+# -------- CONVERTER (STEP 5 INTEGRATION) --------
 def news_to_event(news):
 
-    # ✅ Clamp values (VERY IMPORTANT)
-    sentiment = max(min(news.get("sentiment", 0), 1), -1)
-    impact = min(max(news.get("impact", 0.5), 0), 1)
-    duration = max(300, news.get("duration", 1200)) # Default long living effect 20 mins!
-    volume_spike = min(max(news.get("volume_spike", 0.3), 0), 1)
+    # Map Step 1 schema to Event Logic
+    # sentiment_score is the directional shift
+    sentiment = max(min(float(news.get("sentiment_score", 0)), 1.0), -1.0)
+    
+    # impact_target is the magnitude
+    impact = min(max(float(news.get("impact_target", 0.5)), 0.0), 1.0)
+    
+    # Standard 30 minute duration for simulation impact
+    duration = 1800 
+    
+    # Volume spike target
+    volume_spike = min(max(float(news.get("volume_spike_target", 0.3)), 0.0), 1.0)
 
-    # ✅ RETURN OBJECT, NOT DICT
     return MarketEvent(
         sentiment=sentiment,
         impact=impact,
         duration=duration,
-        target=news.get("target", "IT"),
+        target=news.get("target", "TCS"),
         volume_spike=volume_spike
     )

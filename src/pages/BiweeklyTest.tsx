@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback, ReactNode } from 'react';
 import { Layout } from '@/components/Layout';
 import { motion, AnimatePresence } from 'framer-motion';
-import { createChart, IChartApi } from 'lightweight-charts';
+import { createChart, IChartApi, LineSeries, CandlestickSeries, HistogramSeries } from 'lightweight-charts';
 import { Clock, TrendingUp, TrendingDown, Minus, AlertTriangle, Plus } from 'lucide-react';
 
 class ErrorBoundary extends React.Component<{ children: ReactNode }, { hasError: boolean, error: Error | null }> {
@@ -121,8 +121,7 @@ const BiweeklyTestContent = () => {
     let newSeries: any;
 
     if (activeChart === 'Line Graph') {
-      newSeries = chart.addSeries({
-        type: 'Line',
+      newSeries = chart.addSeries(LineSeries, {
         color: 'hsl(185, 100%, 50%)',
         lineWidth: 2,
       });
@@ -135,8 +134,7 @@ const BiweeklyTestContent = () => {
       newSeries.setData(lineData);
 
     } else if (activeChart === 'Candlestick Graph') {
-      newSeries = chart.addSeries({
-        type: 'Candlestick',
+      newSeries = chart.addSeries(CandlestickSeries, {
         upColor: 'hsl(150, 100%, 45%)',
         downColor: 'hsl(0, 80%, 55%)',
         borderVisible: false,
@@ -155,8 +153,7 @@ const BiweeklyTestContent = () => {
       newSeries.setData(candleData);
 
     } else if (activeChart === 'Volume Graph') {
-      newSeries = chart.addSeries({
-        type: 'Histogram',
+      newSeries = chart.addSeries(HistogramSeries, {
         priceFormat: { type: 'volume' },
         base: 0,
       });
@@ -178,7 +175,7 @@ const BiweeklyTestContent = () => {
 
   // ── WEBSOCKET ──
   useEffect(() => {
-    const ws = new WebSocket('ws://localhost:8000/ws');
+    const ws = new WebSocket('ws://localhost:8080/ws');
     ws.onmessage = (event) => {
       const data = JSON.parse(event.data);
       if (data.type === 'history') {
@@ -279,7 +276,7 @@ const BiweeklyTestContent = () => {
               .news-marquee {
                 display: inline-block;
                 white-space: nowrap;
-                animation: scroll-news 20s linear infinite;
+                animation: scroll-news 100s linear infinite;
                 will-change: transform;
                 padding-left: 100%;
               }

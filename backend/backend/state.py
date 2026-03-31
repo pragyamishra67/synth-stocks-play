@@ -29,6 +29,12 @@ class MarketState:
         self.tick_data = []
         self.candle_data = defaultdict(list)
         self.current_candle = {}
+        
+        # --- NEW FOR REAL-TIME SIMULATION ---
+        self.live_stream_buffer = defaultdict(list)
+        self.stream_index = defaultdict(int)
+        self.price_offsets = defaultdict(float) # For news impact persistence
+        
         self.base_prices = self.stock_prices.copy()
 
 state = MarketState()

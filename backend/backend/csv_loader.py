@@ -4,7 +4,13 @@ import time
 from state import state
 
 def load_csv_history():
-    print("Loading CSV history...")
+    """
+    Step 2: INITIAL DATA LOADING
+    Loads CSV data for each stock and splits it into:
+    - 25% Static History (plotted immediately)
+    - 75% Live Streaming Data (for Step 4)
+    """
+    print("Loading CSV datasets for simulation engine...")
     base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     data_dir = os.path.join(base_dir, "real_stock_data")
     
@@ -15,59 +21,74 @@ def load_csv_history():
         "MARUTI": "Maruti_Suzuki.csv"
     }
 
-    # Configuration for initial history
-    num_candles = 100
-    candle_time_interval = 5 # 5 sec candles
+    candle_time_interval = 5  # Standard 5s candle interval from requirements
     now = time.time()
     
     for stock, filename in mapping.items():
         path = os.path.join(data_dir, filename)
         if not os.path.exists(path):
-            print(f"⚠️ CSV missing: {path}")
+            print(f"⚠️ Dataset missing: {path}")
             continue
 
         try:
-            # yfinance creates skipping headers
-            # Row 4 has real data: Date, Close, High, Low, Open, Volume
+            # Step 2: Load full dataset
+            # Columns: Date, Close, High, Low, Open, Volume
             df = pd.read_csv(path, skiprows=3, names=['Date', 'Close', 'High', 'Low', 'Open', 'Volume'])
             df = df.dropna()
             
-            # Take closing data
-            history_rows = df.tail(num_candles).copy()
+            total_rows = len(df)
+            if total_rows < 10:
+                print(f"⚠️ Not enough data in {filename}")
+                continue
+
+            # Step 2: Split 25/75
+            static_count = int(total_rows * 0.25)
             
-            # Timestamp generation ensuring end matches near time.time()
-            start_time = now - (len(history_rows) * candle_time_interval)
+            static_df = df.iloc[:static_count].copy()
+            live_df = df.iloc[static_count:].copy()
+
+            # --- PROCESS STATIC DATA (Step 3) ---
+            # Set time for history points working backward from now
+            static_start_time = now - (static_count * candle_time_interval)
             
-            candle_list = []
-            
-            for idx, row in enumerate(history_rows.itertuples()):
-                candle_time = start_time + (idx * candle_time_interval)
-                c_open = max(float(row.Open), 1)
-                c_high = max(float(row.High), 1)
-                c_low = max(float(row.Low), 1)
-                c_close = max(float(row.Close), 1)
+            static_list = []
+            for idx, row in enumerate(static_df.itertuples()):
+                c_time = int(static_start_time + (idx * candle_time_interval))
                 
-                candle = {
+                static_list.append({
                     "open": float(row.Open),
                     "high": float(row.High),
                     "low": float(row.Low),
                     "close": float(row.Close),
                     "volume": float(row.Volume) if pd.notna(row.Volume) else 1000,
-                    "ticks": 10,  # Faked ticks
-                    "time": int(candle_time)
-                }
-                candle_list.append(candle)
+                    "ticks": 10,
+                    "time": c_time
+                })
             
-            if len(candle_list) > 0:
-                state.candle_data[stock] = candle_list
-                last_close = candle_list[-1]["close"]
-                
-                # Base prices updated properly
-                state.stock_prices[stock] = last_close
-                state.base_prices[stock] = last_close
-                print(f"✅ Indexed {len(candle_list)} historical candles for {stock}. Ending Price: {last_close:.2f}")
+            state.candle_data[stock] = static_list
+            print(f"✅ Initialized {stock} with {len(static_list)} static candles (25%)")
+
+            # --- PROCESS LIVE STREAMING BUFFER (Step 4) ---
+            live_list = []
+            for idx, row in enumerate(live_df.itertuples()):
+                # Prepare live baseline data from CSV
+                live_list.append({
+                    "open": float(row.Open),
+                    "high": float(row.High),
+                    "low": float(row.Low),
+                    "close": float(row.Close),
+                    "volume": float(row.Volume) if pd.notna(row.Volume) else 1000,
+                })
+            
+            state.live_stream_buffer[stock] = live_list
+            state.stream_index[stock] = 0
+            
+            # Initialize current price to end of history
+            if static_list:
+                state.stock_prices[stock] = static_list[-1]["close"]
+                state.base_prices[stock] = static_list[-1]["close"]
 
         except Exception as e:
-            print(f"❌ Error indexing CSV for {stock}: {e}")
+            print(f"❌ Critical error loading {stock}: {e}")
 
-    print("✅ CSV History Loaded successfully!")
+    print(f"✅ Simulation buffer populated. Ready for live stream.")
