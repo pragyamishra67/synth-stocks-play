@@ -12,10 +12,17 @@ from contextlib import asynccontextmanager
 import uvicorn
 from collections import defaultdict
 
-# -------- LOAD ENV --------
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.append(BASE_DIR)
-load_dotenv(os.path.join(BASE_DIR, ".env"))
+# -------- LOAD ENV & PATHS --------
+# server.py is in backend/backend/
+CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
+BACKEND_ROOT = os.path.dirname(CURRENT_DIR) # backend/
+
+if BACKEND_ROOT not in sys.path:
+    sys.path.append(BACKEND_ROOT)
+if CURRENT_DIR not in sys.path:
+    sys.path.append(CURRENT_DIR)
+
+load_dotenv(os.path.join(BACKEND_ROOT, ".env"))
 
 API_KEYS = []
 for key_name in ["GEMINI_API_KEY", "GEMINI_API_KEY1", "GEMINI_API_KEY2"]:
@@ -24,7 +31,8 @@ for key_name in ["GEMINI_API_KEY", "GEMINI_API_KEY1", "GEMINI_API_KEY2"]:
         API_KEYS.append(val)
 
 if not API_KEYS:
-    raise ValueError("❌ No GEMINI_API_KEY found in .env")
+    print("⚠️ Warning: No GEMINI_API_KEY found in .env")
+    API_KEYS = ["dummy_key"] 
 
 
 # -------- IMPORT YOUR SYSTEM --------
@@ -53,34 +61,38 @@ async def broadcast(data):
         try:
             await client.send_text(json.dumps(data))
         except:
-            pass # Handle disconnected clients gracefully
+            pass 
 
 
 # -------- LIFESPAN AND SIMULATION LOOP --------
 @asynccontextmanager
 async def lifespan(app: FastAPI):
 
-    # Step 2: Load and Split CSV (25% history, 75% streaming)
+    print("📊 STEP 2: Loading CSV datasets...")
     load_csv_history()
+    print("✅ CSV Datasets Loaded.")
 
     async def loop():
         # STEP 1: INITIAL NEWS GENERATION (MANDATORY START)
         print("🚀 STEP 1: Generating Initial Market News...")
-        initial_news = news_engine.generate_news()
-        if initial_news:
-            valid_news = []
-            # we only take 4
-            for news in initial_news[:4]:
-                if news_engine.validate(news):
-                    event = news_to_event(news)
-                    event_engine.add_event(event)
-                    valid_news.append({
-                        "headline": news["headline"],
-                        "description": news["description"],
-                        "target": news["target"]
-                    })
-            if valid_news:
-                await broadcast({"type": "news_batch", "news": valid_news, "time": time.time()})
+        try:
+            initial_news = news_engine.generate_news()
+            if initial_news:
+                valid_news = []
+                for news in initial_news[:4]:
+                    if news_engine.validate(news):
+                        event = news_to_event(news)
+                        event_engine.add_event(event)
+                        valid_news.append({
+                            "headline": news["headline"],
+                            "description": news["description"],
+                            "target": news["target"]
+                        })
+                if valid_news:
+                    await broadcast({"type": "news_batch", "news": valid_news, "time": time.time()})
+                    print(f"✅ News Broadcasted: {len(valid_news)} items.")
+        except Exception as e:
+            print(f"⚠️ News Generator Error: {e}")
         
         last_news_time = time.time()
         tick_counter = 0
@@ -93,7 +105,6 @@ async def lifespan(app: FastAPI):
                 tick = engine.get_streaming_tick(stock)
                 if tick:
                     tick_buffers[stock].append(tick)
-                    # Broadcast Tick (1s)
                     await broadcast({
                         "type": "tick",
                         "stock": stock,
@@ -101,7 +112,6 @@ async def lifespan(app: FastAPI):
                         "time": tick["time"]
                     })
                     
-                    # Broadcast Analytics (Sync with data)
                     pattern = pattern_engine.detect(stock)
                     risk_reward = risk_engine.get_ratio(stock)
                     await broadcast({
@@ -150,9 +160,7 @@ async def lifespan(app: FastAPI):
                         await broadcast({"type": "news_batch", "news": valid_news, "time": current_time})
                 last_news_time = current_time
 
-            # EVENT CLEANUP
             event_engine.cleanup()
-            
             await asyncio.sleep(1)
 
     task = asyncio.create_task(loop())
@@ -177,8 +185,7 @@ async def websocket_endpoint(ws: WebSocket):
     await ws.accept()
     clients.append(ws)
 
-    # Step 3: INITIAL GRAPH RENDERING (Send 25% History)
-    for stock in state.stock_prices:
+    for stock in ["TCS", "INFY", "HDFCBANK", "MARUTI"]:
         if state.candle_data[stock]:
             await ws.send_text(json.dumps({
                 "type": "history",
@@ -196,4 +203,5 @@ async def websocket_endpoint(ws: WebSocket):
 
 # -------- ENTRY POINT --------
 if __name__ == "__main__":
-    uvicorn.run("server:app", host="localhost", port=8080, reload=True)
+    # Use 0.0.0.0 for deployment visibility
+    uvicorn.run("server:app", host="0.0.0.0", port=8080, reload=True)
