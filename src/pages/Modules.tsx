@@ -131,7 +131,7 @@ const Modules = () => {
     const score = mod.quiz.reduce((s, q, i) => s + (answers[i] === q.correct ? 1 : 0), 0);
 
     return (
-      <Layout>
+      <Layout hideChatbar={quizMode}>
         <div className="max-w-3xl mx-auto">
           <button onClick={() => { setActiveModule(null); setQuizMode(false); setAnswers([]); setSubmitted(false); }}
             className="font-mono text-xs text-muted-foreground hover:text-primary mb-4 inline-block">
