@@ -70,7 +70,7 @@ export function Layout({ children, hideChatbar = false }: { children: ReactNode;
       </main>
 
       {/* Persistent Chat Search Bar */}
-      <ChatSearchBar />
+      {!hideChatbar && <ChatSearchBar />}
     </div>
   );
 }
