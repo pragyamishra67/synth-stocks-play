@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+// Live Trading page
+import { useState, useEffect, useCallback } from 'react';
 import { useUser } from '@/contexts/UserContext';
 import { Layout } from '@/components/Layout';
 import { 
