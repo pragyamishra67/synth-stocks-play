@@ -11,6 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 import uvicorn
 from collections import defaultdict
+import pandas as pd
 
 # -------- LOAD ENV & PATHS --------
 # server.py is in backend/backend/
@@ -89,6 +90,7 @@ async def lifespan(app: FastAPI):
                             "target": news["target"]
                         })
                 if valid_news:
+                    state.current_news = valid_news
                     await broadcast({"type": "news_batch", "news": valid_news, "time": time.time()})
                     print(f"✅ News Broadcasted: {len(valid_news)} items.")
         except Exception as e:
@@ -157,6 +159,7 @@ async def lifespan(app: FastAPI):
                                 "target": news["target"]
                             })
                     if valid_news:
+                        state.current_news = valid_news
                         await broadcast({"type": "news_batch", "news": valid_news, "time": current_time})
                 last_news_time = current_time
 
@@ -179,6 +182,63 @@ app.add_middleware(
 )
 
 
+import time
+
+# -------- LIVE TRADING DATA API --------
+@app.get("/api/live-trading/data/{symbol}")
+async def get_live_trading_data(symbol: str):
+    # Map symbols to CSV filenames
+    mapping = {
+        "TCS": "TCS.csv",
+        "INFOSYS": "INFOSYS.csv",
+        "HDFCBANK": "HDFCBANK.csv",
+        "RELIANCE": "RELIANCE.csv",
+        "TATA_MOTORS": "TATA_MOTORS.csv"
+    }
+    
+    filename = mapping.get(symbol.upper())
+    if not filename:
+        return {"error": f"Invalid symbol: {symbol}"}
+
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    data_path = os.path.join(os.path.dirname(current_dir), "live_trading", "data", filename)
+
+    if not os.path.exists(data_path):
+        return {"error": f"Data file not found: {filename}"}
+
+    try:
+        # yfinance CSVs have 3 header rows. 
+        df = pd.read_csv(data_path, skiprows=3, names=['Datetime', 'Close', 'High', 'Low', 'Open', 'Volume'])
+        
+        # --- SYNTHESIZED TIME LOGIC ---
+        # Requirement: Ignore CSV timestamps. 
+        # Last point = Current Time.
+        # Spacing = Exactly 1 second per point.
+        now = int(time.time())
+        num_points = len(df)
+        
+        # Generate strictly increasing 1-second intervals ending at 'now'
+        # Formula: time_at_index_i = now - (last_index - i)
+        synthesized_times = [now - (num_points - 1 - i) for i in range(num_points)]
+        
+        # Format for frontend
+        data = []
+        for i, (_, row) in enumerate(df.iterrows()):
+            data.append({
+                "time": synthesized_times[i],
+                "open": float(row['Open']),
+                "high": float(row['High']),
+                "low": float(row['Low']),
+                "close": float(row['Close']),
+                "volume": int(row['Volume'])
+            })
+        
+        return {"symbol": symbol, "data": data}
+    except Exception as e:
+        print(f"❌ Error parsing {filename}: {e}")
+        return {"error": str(e)}
+
+
 # -------- WEBSOCKET ENDPOINT --------
 @app.websocket("/ws")
 async def websocket_endpoint(ws: WebSocket):
@@ -192,6 +252,13 @@ async def websocket_endpoint(ws: WebSocket):
                 "stock": stock,
                 "data": state.candle_data[stock]
             }))
+    
+    if state.current_news:
+        await ws.send_text(json.dumps({
+            "type": "news_batch",
+            "news": state.current_news,
+            "time": time.time()
+        }))
 
     try:
         while True:
