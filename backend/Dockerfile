@@ -20,4 +20,4 @@ EXPOSE 8080
 
 # Run the server from the backend/backend/ directory
 # Use the module path for uvicorn
-CMD ["uvicorn", "backend.server:app", "--host", "0.0.0.0", "--port", "8080"]
+CMD ["sh", "-c", "uvicorn backend.server:app --host 0.0.0.0 --port ${PORT:-10000}"]
