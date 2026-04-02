@@ -1,3 +1,5 @@
+ENV FORCE_REBUILD=1
+
 # Use Python 3.11 slim as base image
 FROM python:3.11-slim
 
