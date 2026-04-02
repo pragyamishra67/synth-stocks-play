@@ -6,7 +6,7 @@ WORKDIR /app
 
 # Install dependencies
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --upgrade pip && pip install --no-cache-dir -r requirements.txt
 
 # Copy backend files
 COPY . .
@@ -20,4 +20,4 @@ EXPOSE 8080
 
 # Run the server from the backend/backend/ directory
 # Use the module path for uvicorn
-CMD ["sh", "-c", "uvicorn backend.server:app --host 0.0.0.0 --port ${PORT:-10000}"]
+CMD ["sh", "-c", "uvicorn backend.server:app --host 0.0.0.0 --port $PORT"]

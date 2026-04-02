@@ -201,17 +201,15 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "http://localhost:3000",
+        "http://localhost:5173",
+    ],
+    allow_origin_regex=r"https://.*\.vercel\.app",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
-origins = [
-    "http://localhost:3000",               # for local dev testing
-    "http://localhost:5173",               # default Vite port
-    "https://synth-stocks-play.vercel.app",         # your Vercel URL (update this)
-]
-
 
 import time
 
