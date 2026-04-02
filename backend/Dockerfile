@@ -13,10 +13,6 @@ COPY . .
 
 # Set environment variables for simulation logic
 ENV PYTHONUNBUFFERED=1
-ENV PORT=8080
-
-# Expose the port
-EXPOSE 8080
 
 # Run the server from the backend/backend/ directory
 # Use the module path for uvicorn
